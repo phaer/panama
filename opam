@@ -1,0 +1,25 @@
+opam-version: "1.2"
+maintainer: "phaer <hello@phaer.org>"
+authors: ["phaer <hello@phaer.org>"]
+homepage: "https://github.com/phaer/panama"
+doc: "https://phaer.org/panama/doc"
+license: "ISC"
+dev-repo: "https://github.com/phaer/panama.git"
+bug-reports: "https://github.com/phaer/panama/issues"
+tags: []
+available: [ ocaml-version >= "4.04.0"]
+depends: [
+  "ocamlfind" {build}
+  "ocamlbuild" {build}
+  "topkg" {build}
+  "ppx_deriving"
+  "ppx_deriving_yojson"
+  "containers"
+  "lwt"
+  "websocket"
+  "yojson"
+]
+depopts: []
+build: [
+  "ocaml" "pkg/pkg.ml" "build"
+          "--pinned" pinned ]
