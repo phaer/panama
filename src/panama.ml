@@ -39,11 +39,20 @@ let start web_address mpv_address =
     Lwt_stream.next actions
     >>= fun (action) ->
     let action_string = Panama_player.Action.show action in
-    let command, new_state = Panama_store.update !state action in
+    let old_state = !state in
+    let command, new_state = Panama_store.update old_state action in
 
-    Lwt_log.ign_info_f ~section "action: %s" action_string;
+    Lwt_log.ign_debug_f ~section "action: %s" action_string;
     state := new_state;
-    Lwt.return @@ web_push @@ Some (Panama_store.to_yojson @@ new_state)
+    mpv_push @@ command;
+
+    let broadcast_state_p = new_state <> old_state
+                            || action == Panama_player.Action.Update
+    in
+    Lwt.return (
+      if broadcast_state_p
+      then web_push @@ Some (Panama_store.to_yojson @@ new_state)
+      else ())
     >>= loop
   in
   loop ()
