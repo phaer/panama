@@ -68,7 +68,7 @@ let listen input_channel push () =
     (match Panama_player.Action.of_mpv_yojson @@ Yojson.Safe.from_string message with
     | Ok action -> Lwt.return @@ push @@ Some action
     | Error error ->
-      Lwt_log.error_f ~section "received invalid json: %s\n%s" message error)
+      Lwt_log.info_f ~section "received unhandled json: %s %s" message)
     >>= loop
   in
   loop ()
