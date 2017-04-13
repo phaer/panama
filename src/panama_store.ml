@@ -10,7 +10,7 @@ type t = {
   playing: bool;
   volume : int;
   position : int;
-  playlist : Panama_player.PlaylistItem.t list;
+  playlist : PlaylistItem.t list;
 } [@@deriving show, yojson]
 
 
@@ -18,7 +18,7 @@ let with_property state = function
   | Property.Pause v    -> {state with playing = not v}
   | Property.Volume v   -> {state with volume = v}
   | Property.Position v -> {state with position = v}
-  | Property.Playlist v -> {state with playlist = v}
+  | Property.Playlist v -> {state with playlist = List.mapi PlaylistItem.set_index v}
   | _                   -> state
 
 
@@ -34,9 +34,17 @@ let update state action =
      set_property state @@ Property.Volume vol
    | Action.Position pos ->
      set_property state @@ Property.Position pos
+   | Action.PlaylistAdd url ->
+     (Command.LoadFile (url, "append-play"),
+      state)
+   | Action.PlaylistRemove index ->
+     (Command.PlaylistRemove index,
+      state)
+   | Action.PlaylistSelect index ->
+     set_property state @@ Property.PlaylistPosition index
    | Action.PropertyChange property ->
      (Command.Noop,
-     with_property state property)
+      with_property state property)
    | _ ->
      (Command.Noop,
       state))

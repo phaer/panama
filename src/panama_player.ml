@@ -10,10 +10,21 @@ let section = Lwt_log.Section.make "player"
 
 module PlaylistItem = struct
   type t = {
-    filename : string;
+    filename: string;
+    title: string option [@default None];
+    media_url: string option [@default None];
+    index : int [@default 0];
     current : bool [@default false];
     playing : bool [@default false];
   } [@@deriving show, yojson]
+
+  let to_yojson t =
+    let json = to_yojson t in
+    `Assoc [("source_url", `String t.filename);
+            ("index", `Int t.index);
+            ("current", `Bool t.current)]
+
+  let set_index i e = {e with index = i}
 end
 
 
@@ -29,7 +40,9 @@ module Property = struct
   let of_yojson json =
     of_yojson @@ match json with
     | `List [`String "percent-pos"; `Float f] ->
-        `List [`String "percent-pos"; `Int (int_of_float f)]
+      `List [`String "percent-pos"; `Int (int_of_float f)]
+    | `List [`String "volume"; `Float f] ->
+        `List [`String "volume"; `Int (int_of_float f)]
     | x -> x
 end
 
