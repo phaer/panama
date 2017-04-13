@@ -98,8 +98,7 @@ let handle_connection push client =
   | Exit ->
       Lwt_log.info_f ~section "Client %d closed connection" id
   | exn ->
-      Lwt_log.info_f ~section "Connection to client %d lost" id >>= fun () ->
-      Lwt.fail exn
+      Lwt_log.error_f ~exn ~section "Connection to client %d lost" id
 
 
 let rec handle_outgoing outgoing () =
