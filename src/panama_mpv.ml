@@ -54,7 +54,9 @@ end
 let rec handle_outgoing output_channel outgoing () =
     Lwt_stream.next outgoing
     >>= fun (command) ->
-    Lwt_io.write_line output_channel @@ Command.to_payload command
+    let payload = Command.to_payload command in
+    Lwt_log.ign_debug_f ~section "sending: %s" payload;
+    Lwt_io.write_line output_channel payload
     >>= fun () -> Lwt_io.flush output_channel
     >>= handle_outgoing output_channel outgoing
 
