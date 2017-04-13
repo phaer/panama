@@ -51,8 +51,6 @@ module Command = struct
 end
 
 
-
-
 let rec handle_outgoing output_channel outgoing () =
     Lwt_stream.next outgoing
     >>= fun (command) ->
@@ -95,6 +93,15 @@ let start (socket_path) =
       Lwt.async (listen input_channel push_incoming);
       Lwt.async (handle_outgoing output_channel outgoing);
   );
+
+  let properties_to_observe = [
+    (Panama_player.Property.Pause false);
+    (Panama_player.Property.Position 0);
+    (Panama_player.Property.Volume 0);
+    (Panama_player.Property.Playlist []);
+  ]
+  in
+  List.iteri (fun i p -> push_outgoing @@ Command.ObserveProperty (i, p)) properties_to_observe;
 
   Lwt_log.ign_info_f ~section "listening to %s" socket_path;
   (incoming, push_outgoing)

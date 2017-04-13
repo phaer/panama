@@ -9,7 +9,6 @@
 
 open Lwt.Infix
 
-
 let _ = Lwt_log.(add_rule "*" Debug)
 let section = Lwt_log.Section.make "main"
 
@@ -24,7 +23,6 @@ let start web_address mpv_address =
   let mpv_in, mpv_push = Panama_mpv.start mpv_address in
   let actions = Lwt_stream.choose [web_in; mpv_in] in
 
-  mpv_push @@ Panama_mpv.Command.ObserveProperty (1, (Panama_player.Property.Pause false));
   mpv_push @@ Panama_mpv.Command.LoadFile ("https://www.youtube.com/watch?v=10zB1p1nXHg", "append-play");
 
   let state = ref (Panama_store.{
