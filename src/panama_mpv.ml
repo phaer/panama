@@ -7,6 +7,7 @@
     outgoing - Commands to update the client.
 *)
 open Lwt.Infix
+module Player = Panama_player
 
 
 let section = Lwt_log.Section.make "mpv"
@@ -14,9 +15,9 @@ let section = Lwt_log.Section.make "mpv"
 
 module Command = struct
   type t
-    = ObserveProperty of int * Panama_player.Property.t [@name "observe_property"]
-    | GetProperty of Panama_player.Property.t [@name "get_property"]
-    | SetProperty of Panama_player.Property.t [@name "set_property"]
+    = ObserveProperty of int * Player.Property.t [@name "observe_property"]
+    | GetProperty of Player.Property.t [@name "get_property"]
+    | SetProperty of Player.Property.t [@name "set_property"]
     | LoadFile of string * string [@name "loadfile"]
     | ShowText of string [@name "show_text"]
     | PlaylistRemove of int [@name "playlist_remove"]
@@ -65,10 +66,10 @@ let listen input_channel push () =
   let rec loop () =
     Lwt_io.read_line input_channel
     >>= fun (message) ->
-    (match Panama_player.Action.of_mpv_yojson @@ Yojson.Safe.from_string message with
+    (match Player.Action.of_mpv_yojson @@ Yojson.Safe.from_string message with
     | Ok action -> Lwt.return @@ push @@ Some action
     | Error error ->
-      Lwt_log.info_f ~section "received unhandled json: %s %s" message)
+      Lwt_log.info_f ~section "received unhandled json: %s" message)
     >>= loop
   in
   loop ()
@@ -97,10 +98,10 @@ let start (socket_path) =
   );
 
   let properties_to_observe = [
-    (Panama_player.Property.Pause false);
-    (Panama_player.Property.Position 0);
-    (Panama_player.Property.Volume 0);
-    (Panama_player.Property.Playlist []);
+    (Player.Property.Pause false);
+    (Player.Property.Position 0);
+    (Player.Property.Volume 0);
+    (Player.Property.Playlist []);
   ]
   in
   List.iteri (fun i p -> push_outgoing @@ Command.ObserveProperty (i, p)) properties_to_observe;

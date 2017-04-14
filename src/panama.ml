@@ -6,8 +6,12 @@
 
     {e %%VERSION%% - {{:%%PKG_HOMEPAGE%% }homepage}}.
 *)
-
 open Lwt.Infix
+module Store = Panama_store
+module Player = Panama_player
+module Mpv = Panama_mpv
+module Web = Panama_web
+
 
 let _ = Lwt_log.(add_rule "*" Debug)
 let section = Lwt_log.Section.make "main"
@@ -18,14 +22,15 @@ let web_address = ("127.0.0.1", 3000)
 let mpv_address = "/tmp/mpv.socket"
 (** path of mpvs ipc socket *)
 
+
 let start web_address mpv_address =
-  let web_in, web_push = Panama_web.start web_address in
-  let mpv_in, mpv_push = Panama_mpv.start mpv_address in
+  let web_in, web_push = Web.start web_address in
+  let mpv_in, mpv_push = Mpv.start mpv_address in
   let actions = Lwt_stream.choose [web_in; mpv_in] in
 
-  mpv_push @@ Panama_mpv.Command.LoadFile ("https://www.youtube.com/watch?v=10zB1p1nXHg", "append-play");
+  mpv_push @@ Mpv.Command.LoadFile ("https://www.youtube.com/watch?v=10zB1p1nXHg", "append-play");
 
-  let state = ref (Panama_store.{
+  let state = ref (Store.{
       playing = false;
       volume = 50;
       position = 0;
@@ -36,20 +41,20 @@ let start web_address mpv_address =
   let rec loop () =
     Lwt_stream.next actions
     >>= fun (action) ->
-    let action_string = Panama_player.Action.show action in
+    let action_string = Player.Action.show action in
     let old_state = !state in
-    let command, new_state = Panama_store.update old_state action in
+    let command, new_state = Store.update old_state action in
 
     Lwt_log.ign_debug_f ~section "action: %s" action_string;
     state := new_state;
     mpv_push @@ command;
 
     let broadcast_state_p = new_state <> old_state
-                            || action == Panama_player.Action.Update
+                            || action == Player.Action.Update
     in
     Lwt.return (
       if broadcast_state_p
-      then web_push @@ Some (Panama_store.to_yojson @@ new_state)
+      then web_push @@ Some (Store.to_yojson @@ new_state)
       else ())
     >>= loop
   in

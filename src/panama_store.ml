@@ -3,48 +3,50 @@
 (** {5 Panama.State}
 *)
 open Lwt.Infix
-open Panama_player
-open Panama_mpv
+module Player = Panama_player
+module Mpv = Panama_mpv
+
 
 type t = {
   playing: bool;
   volume : int;
   position : int;
-  playlist : PlaylistItem.t list;
+  playlist : Player.PlaylistItem.t list;
 } [@@deriving show, yojson]
 
 
+
 let with_property state = function
-  | Property.Pause v    -> {state with playing = not v}
-  | Property.Volume v   -> {state with volume = v}
-  | Property.Position v -> {state with position = v}
-  | Property.Playlist v -> {state with playlist = List.mapi PlaylistItem.set_index v}
+  | Player.Property.Pause v    -> {state with playing = not v}
+  | Player.Property.Volume v   -> {state with volume = v}
+  | Player.Property.Position v -> {state with position = v}
+  | Player.Property.Playlist v -> {state with playlist = List.mapi Player.PlaylistItem.set_index v}
   | _                   -> state
 
 
 let set_property state property =
-  (Command.SetProperty property, with_property state property)
+  (Mpv.Command.SetProperty property, with_property state property)
 
 
 let update state action =
   (match action with
-   | Action.TogglePlay ->
-     set_property state @@ Property.Pause state.playing
-   | Action.Volume vol ->
-     set_property state @@ Property.Volume vol
-   | Action.Position pos ->
-     set_property state @@ Property.Position pos
-   | Action.PlaylistAdd url ->
-     (Command.LoadFile (url, "append-play"),
+   | Player.Action.TogglePlay ->
+     set_property state @@ Player.Property.Pause state.playing
+   | Player.Action.Volume vol ->
+     set_property state @@ Player.Property.Volume vol
+   | Player.Action.Position pos ->
+     set_property state @@ Player.Property.Position pos
+   | Player.Action.PlaylistAdd url ->
+     (Mpv.Command.LoadFile (url, "append-play"),
       state)
-   | Action.PlaylistRemove index ->
-     (Command.PlaylistRemove index,
+   | Player.Action.PlaylistRemove index ->
+     (Mpv.Command.PlaylistRemove index,
       state)
-   | Action.PlaylistSelect index ->
-     set_property state @@ Property.PlaylistPosition index
-   | Action.PropertyChange property ->
-     (Command.Noop,
+   | Player.Action.PlaylistSelect index ->
+     set_property state @@ Player.Property.PlaylistPosition index
+   | Player.Action.PropertyChange property ->
+     (Mpv.Command.Noop,
       with_property state property)
    | _ ->
-     (Command.Noop,
+     (Mpv.Command.Noop,
       state))
