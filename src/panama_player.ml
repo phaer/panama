@@ -19,7 +19,6 @@ module PlaylistItem = struct
   } [@@deriving show, yojson]
 
   let to_yojson t =
-    let json = to_yojson t in
     `Assoc [("source_url", `String t.filename);
             ("index", `Int t.index);
             ("current", `Bool t.current)]
@@ -45,6 +44,7 @@ module Property = struct
         `List [`String "volume"; `Int (int_of_float f)]
     | x -> x
 end
+
 
 module Action = struct
   type t
