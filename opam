@@ -12,10 +12,14 @@ depends: [
   "ocamlfind" {build}
   "ocamlbuild" {build}
   "topkg" {build}
+  "crunch" {build}
+  "io-page"
+  "mirage-kv"
   "ppx_deriving"
   "ppx_deriving_yojson"
   "containers"
   "lwt"
+  "cohttp"
   "websocket"
   "yojson"
 ]
