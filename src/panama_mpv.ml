@@ -110,7 +110,7 @@ let listen input_channel push () =
       | Some id ->
         if Hashtbl.mem pending_requests id
         then Lwt_mvar.put (Hashtbl.find pending_requests id) data
-        else Lwt_log.error_f ~section "response for unknown request: %d" id
+        else Lwt.return_unit
       | None -> Lwt.return_unit)
     >>= loop
   in

@@ -6,6 +6,7 @@ open Lwt.Infix
 module Player = Panama_player
 module Mpv = Panama_mpv
 
+let section = Lwt_log.Section.make "player"
 
 type t = {
   playing: bool;
@@ -20,8 +21,18 @@ let with_property state = function
   | Player.Property.Pause v    -> {state with playing = not v}
   | Player.Property.Volume v   -> {state with volume = v}
   | Player.Property.Position v -> {state with position = v}
-  | Player.Property.Playlist v -> {state with playlist = List.mapi Player.PlaylistItem.set_index v}
-  | _                   -> state
+  | Player.Property.Playlist v ->
+    {state with playlist = Player.PlaylistItem.of_mpv_playlist state.playlist v }
+
+  | Player.Property.PlaylistPosition v ->
+    { state with
+      playlist = Player.PlaylistItem.with_item_at_position v
+          state.playlist (Player.PlaylistItem.set_loading true)}
+  | Player.Property.Loading v ->
+    Lwt_log.ign_debug_f ~section "LOADING: %s" @@ string_of_bool v;
+    {state with
+     playlist = Player.PlaylistItem.with_current_item
+         state.playlist (Player.PlaylistItem.set_loading v)}
 
 
 let set_property state property =
