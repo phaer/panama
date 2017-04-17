@@ -28,7 +28,7 @@ let start web_address mpv_address =
   let mpv_in, mpv_push = Mpv.start mpv_address in
   let actions = Lwt_stream.choose [web_in; mpv_in] in
 
-  mpv_push @@ Mpv.Command.LoadFile ("https://www.youtube.com/watch?v=10zB1p1nXHg", "append-play");
+  Mpv.execute_async mpv_push @@ Mpv.Command.LoadFile ("https://www.youtube.com/watch?v=10zB1p1nXHg", "append-play");
 
   let state = ref (Store.{
       playing = false;
@@ -47,7 +47,8 @@ let start web_address mpv_address =
 
     Lwt_log.ign_debug_f ~section "action: %s" action_string;
     state := new_state;
-    mpv_push @@ command;
+    Mpv.execute_async mpv_push command;
+
 
     let broadcast_state_p = new_state <> old_state
                             || action == Player.Action.Update
