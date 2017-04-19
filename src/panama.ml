@@ -23,6 +23,28 @@ let mpv_address = "/tmp/mpv.socket"
 (** path of mpvs ipc socket *)
 
 
+let rec loop web_push mpv_push state actions () =
+  Lwt_stream.next actions
+  >>= fun (action) ->
+  (* let action_string = Player.Action.show action in *)
+  let old_state = !state in
+  let command, new_state = Store.update old_state action in
+
+  (* Lwt_log.ign_debug_f ~section "action: %s" action_string; *)
+  state := new_state;
+  Mpv.execute_async mpv_push command;
+
+
+  let broadcast_state_p = new_state <> old_state
+                          || action == Player.Action.Update
+  in
+  Lwt.return (
+    if broadcast_state_p
+    then web_push @@ Some (Store.to_yojson @@ new_state)
+    else ())
+  >>= loop web_push mpv_push state actions
+
+
 let start web_address mpv_address =
   let web_in, web_push = Web.start web_address in
   let mpv_in, mpv_push = Mpv.start mpv_address in
@@ -37,33 +59,11 @@ let start web_address mpv_address =
       playlist = [];
     })
   in
-
-  let rec loop () =
-    Lwt_stream.next actions
-    >>= fun (action) ->
-    let action_string = Player.Action.show action in
-    let old_state = !state in
-    let command, new_state = Store.update old_state action in
-
-    Lwt_log.ign_debug_f ~section "action: %s" action_string;
-    state := new_state;
-    Mpv.execute_async mpv_push command;
-
-
-    let broadcast_state_p = new_state <> old_state
-                            || action == Player.Action.Update
-    in
-    Lwt.return (
-      if broadcast_state_p
-      then web_push @@ Some (Store.to_yojson @@ new_state)
-      else ())
-    >>= loop
-  in
-  loop ()
+  loop web_push mpv_push state actions ()
 
 let () =
   Lwt_main.run @@
   try%lwt
-  start web_address mpv_address
+    start web_address mpv_address
   with exn ->
     Lwt_log.fatal_f ~exn ~section "fatal"
