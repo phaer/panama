@@ -4,6 +4,14 @@ module Player = Panama_player
 
 let section = Lwt_log.Section.make "web"
 
+type t = {
+  incoming : Player.Action.t Lwt_stream.t;
+  push_incoming : (Player.Action.t option) -> unit;
+  outgoing : Yojson.Safe.json Lwt_stream.t;
+  push_outgoing : (Yojson.Safe.json option) -> unit;
+}
+
+
 let strip_prefix_char c s =
   if s.[0] == c
   then String.sub s 1 @@ String.length s - 1
@@ -36,7 +44,7 @@ module Client = struct
   let broadcast message =
     let content = Yojson.Safe.to_string message in
     let frame = Frame.(create ~content ()) in
-    Lwt_log.ign_info_f ~section "broadcasting: %s" content;
+    (* Lwt_log.ign_info_f ~section "broadcasting: %s" content; *)
     Hashtbl.iter
       (fun id send -> send (Some frame))
       clients
@@ -49,8 +57,8 @@ let rec handle_outgoing outgoing () =
     >>= handle_outgoing outgoing
 
 
-let handle_incoming_message push_incoming message =
-  push_incoming @@
+let handle_incoming_message web message =
+  web.push_incoming @@
   try
     Player.Action.of_maybe_yojson @@ Yojson.Safe.from_string message
   with
@@ -59,12 +67,12 @@ let handle_incoming_message push_incoming message =
     None
 
 
-let handle_incoming_messages client_id push_incoming frame =
+let handle_incoming_messages client_id web frame =
   let open Frame in
   Lwt_log.ign_debug_f ~section "%d <- %s" client_id (show frame);
   match frame.opcode with
   | Opcode.Text ->
-    handle_incoming_message push_incoming frame.content
+    handle_incoming_message web frame.content
   | Opcode.Ping
   | Opcode.Pong -> ()
   | Opcode.Close ->
@@ -75,16 +83,16 @@ let handle_incoming_messages client_id push_incoming frame =
     Client.unregister client_id
 
 
-let handle_websocket outgoing push_incoming conn req body =
+let handle_websocket web conn req body =
   let client_id = !(Client.next_id) in
   Cohttp_lwt_body.drain_body body
   >>= fun () ->
   Websocket_cohttp_lwt.upgrade_connection
     req (fst conn)
-    (handle_incoming_messages client_id push_incoming)
+    (handle_incoming_messages client_id web)
   >>= fun (resp, body, send) ->
   Client.register client_id send;
-  Lwt.async (handle_outgoing outgoing);
+  Lwt.async (handle_outgoing web.outgoing);
   Lwt.return (resp, (body :> Cohttp_lwt_body.t))
 
 let handle_http_file path conn req body =
@@ -97,11 +105,11 @@ let handle_http_file path conn req body =
       Cohttp_lwt_unix.Server.respond_string
         ~status:`Not_found ~body:"404" ()
 
-let handle_request outgoing push_incoming conn req body =
+let handle_request web conn req body =
   let uri_path = Cohttp.Request.uri req |> Uri.path in
   let handler =
     match uri_path with
-    | "/socket" -> handle_websocket outgoing push_incoming
+    | "/socket" -> handle_websocket web
     | _ -> handle_http_file uri_path
   in handler conn req body
 
@@ -117,16 +125,18 @@ let start (host, port) =
   | event -> push_incoming event
   in
   let outgoing, push_outgoing = Lwt_stream.create () in
+  let web = {
+    incoming = incoming;
+    push_incoming = push_incoming;
+    outgoing = outgoing;
+    push_outgoing = push_outgoing;
+  } in
 
   let server = Cohttp_lwt_unix.Server.make
-      ~callback:(handle_request outgoing push_incoming)
+      ~callback:(handle_request web)
       ~conn_closed:connection_closed
       ()
   in
-
   Lwt.async(fun () -> Cohttp_lwt_unix.Server.create ~mode server);
-
-
   Lwt_log.ign_info_f ~section "listening to %s:%d." host port;
-  (incoming, push_outgoing)
-
+  web

@@ -32,7 +32,7 @@ let rec loop web_push mpv_push state actions () =
 
   (* Lwt_log.ign_debug_f ~section "action: %s" action_string; *)
   state := new_state;
-  Mpv.execute_async mpv_push command;
+  Mpv.execute_async mpv command;
 
 
   let broadcast_state_p = new_state <> old_state
@@ -40,17 +40,17 @@ let rec loop web_push mpv_push state actions () =
   in
   Lwt.return (
     if broadcast_state_p
-    then web_push @@ Some (Store.to_yojson @@ new_state)
+    then web.Web.push_outgoing @@ Some (Store.to_yojson @@ new_state)
     else ())
-  >>= loop web_push mpv_push state actions
+  >>= loop web mpv state actions
 
 
 let start web_address mpv_address =
-  let web_in, web_push = Web.start web_address in
-  let mpv_in, mpv_push = Mpv.start mpv_address in
-  let actions = Lwt_stream.choose [web_in; mpv_in] in
+  let web = Web.start web_address in
+  let mpv = Mpv.start mpv_address in
+  let actions = Lwt_stream.choose [web.Web.incoming; mpv.Mpv.incoming] in
 
-  Mpv.execute_async mpv_push @@ Mpv.Command.LoadFile ("https://www.youtube.com/watch?v=10zB1p1nXHg", "append-play");
+  Mpv.execute_async mpv @@ Mpv.Command.LoadFile ("https://www.youtube.com/watch?v=10zB1p1nXHg", "append-play");
 
   let state = ref (Store.{
       playing = false;
@@ -59,7 +59,7 @@ let start web_address mpv_address =
       playlist = [];
     })
   in
-  loop web_push mpv_push state actions ()
+  loop web mpv state actions ()
 
 let () =
   Lwt_main.run @@

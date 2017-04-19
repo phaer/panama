@@ -15,6 +15,13 @@ let pending_requests = Hashtbl.create 100
 
 exception Mpv_error of string
 
+type t = {
+  incoming : Player.Action.t Lwt_stream.t;
+  push_incoming : (Player.Action.t option) -> unit;
+  outgoing : string Lwt_stream.t;
+  push_outgoing : (string option) -> unit;
+}
+
 module Command = struct
   type t
     = ObserveProperty of int * Player.Property.t [@name "observe_property"]
@@ -54,39 +61,39 @@ module Command = struct
 
 end
 
-let execute push = function
+let execute mpv = function
   | Command.Noop ->
     Lwt.return `Null
   | command ->
     let promise = Lwt_mvar.create_empty () in
     let id, payload = Command.to_payload command in
     Hashtbl.add pending_requests id promise;
-    push @@ Some payload;
+    mpv.push_outgoing @@ Some payload;
     Lwt_mvar.take promise
 
-let execute_async push = function
+let execute_async mpv = function
   | Command.Noop ->
     ()
   | command ->
     let _, payload = Command.to_payload command in
-    push @@ Some payload
+    mpv.push_outgoing @@ Some payload
 
 
-let rec handle_outgoing output_channel outgoing () =
-    Lwt_stream.next outgoing
+let rec handle_outgoing output_channel mpv () =
+    Lwt_stream.next mpv.outgoing
     >>= fun (payload) ->
     Lwt_log.debug_f ~section "sending: %s" payload
     >>= fun () -> Lwt_io.write_line output_channel payload
     >>= fun () -> Lwt_io.flush output_channel
-    >>= handle_outgoing output_channel outgoing
+    >>= handle_outgoing output_channel mpv
 
 
-let listen input_channel push () =
+let listen input_channel mpv () =
   let open Yojson.Safe.Util in
   let rec loop () =
     Lwt_io.read_line input_channel
     >>= fun (message) ->
-    Lwt_log.ign_info_f ~section "received: %s" message;
+    (* Lwt_log.ign_info_f ~section "received: %s" message; *)
     let json =
       try
         Yojson.Safe.from_string @@ message
@@ -102,7 +109,7 @@ let listen input_channel push () =
     | Some error -> raise @@ Mpv_error error);
 
     (match Player.Action.of_mpv_yojson json with
-    | Ok action -> Lwt.return @@ push @@ Some action
+    | Ok action -> Lwt.return @@ mpv.push_incoming @@ Some action
     | Error error -> Lwt.return_unit)
 
     >>= fun () ->
@@ -125,8 +132,13 @@ let start (socket_path) =
   | None -> ()
   | action -> push_incoming action
   in
-
   let outgoing, push_outgoing = Lwt_stream.create() in
+  let mpv = {
+    incoming = incoming;
+    push_incoming = push_incoming;
+    outgoing = outgoing;
+    push_outgoing = push_outgoing;
+  } in
 
   let properties_to_observe = [
     (Player.Property.Pause false);
@@ -135,18 +147,17 @@ let start (socket_path) =
     (Player.Property.Playlist []);
   ]
   in
-  List.iteri (fun i p -> execute_async push_outgoing (Command.ObserveProperty (i, p))) properties_to_observe;
+  List.iteri (fun i p -> execute_async mpv (Command.ObserveProperty (i, p))) properties_to_observe;
 
   Lwt.async (
     fun () ->
       try%lwt
         Lwt_io.open_connection address
         >|= fun (input_channel, output_channel) ->
-        Lwt.async (listen input_channel push_incoming);
-        Lwt.async (handle_outgoing output_channel outgoing);
+        Lwt.async (listen input_channel mpv);
+        Lwt.async (handle_outgoing output_channel mpv);
       with exn ->
         raise (Mpv_error (Printexc.to_string exn))
   );
   Lwt_log.ign_info_f ~section "listening to %s" socket_path;
-
- (incoming, push_outgoing)
+  mpv
