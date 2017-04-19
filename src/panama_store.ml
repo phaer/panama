@@ -3,7 +3,7 @@
 (** {5 Panama.State}
 *)
 open Lwt.Infix
-module Player = Panama_player
+open Panama_player
 module Mpv = Panama_mpv
 
 let section = Lwt_log.Section.make "player"
@@ -12,27 +12,27 @@ type t = {
   playing: bool;
   volume : int;
   position : int;
-  playlist : Player.PlaylistItem.t list;
+  playlist : Playlist.t;
 } [@@deriving show, yojson]
 
 
 
 let with_property state = function
-  | Player.Property.Pause v    -> {state with playing = not v}
-  | Player.Property.Volume v   -> {state with volume = v}
-  | Player.Property.Position v -> {state with position = v}
-  | Player.Property.Playlist v ->
-    {state with playlist = Player.PlaylistItem.of_mpv_playlist state.playlist v }
+  | Property.Pause v    -> {state with playing = not v}
+  | Property.Volume v   -> {state with volume = v}
+  | Property.Position v -> {state with position = v}
+  | Property.Playlist v ->
+    {state with playlist = Playlist.of_mpv state.playlist v }
 
-  | Player.Property.PlaylistPosition v ->
+  | Property.PlaylistPosition v ->
     { state with
-      playlist = Player.PlaylistItem.with_item_at_position v
-          state.playlist (Player.PlaylistItem.set_loading true)}
-  | Player.Property.Loading v ->
+      playlist = Playlist.with_nth_item
+          state.playlist v (PlaylistItem.set_loading true)}
+  | Property.Loading v ->
     Lwt_log.ign_debug_f ~section "LOADING: %s" @@ string_of_bool v;
     {state with
-     playlist = Player.PlaylistItem.with_current_item
-         state.playlist (Player.PlaylistItem.set_loading v)}
+     playlist = Playlist.with_current_item
+         state.playlist (PlaylistItem.set_loading v)}
 
 
 let set_property state property =
@@ -41,21 +41,21 @@ let set_property state property =
 
 let update state action =
   (match action with
-   | Player.Action.TogglePlay ->
-     set_property state @@ Player.Property.Pause state.playing
-   | Player.Action.Volume vol ->
-     set_property state @@ Player.Property.Volume vol
-   | Player.Action.Position pos ->
-     set_property state @@ Player.Property.Position pos
-   | Player.Action.PlaylistAdd url ->
+   | Action.TogglePlay ->
+     set_property state @@ Property.Pause state.playing
+   | Action.Volume vol ->
+     set_property state @@ Property.Volume vol
+   | Action.Position pos ->
+     set_property state @@ Property.Position pos
+   | Action.PlaylistAdd url ->
      (Mpv.Command.LoadFile (url, "append-play"),
       state)
-   | Player.Action.PlaylistRemove index ->
+   | Action.PlaylistRemove index ->
      (Mpv.Command.PlaylistRemove index,
       state)
-   | Player.Action.PlaylistSelect index ->
-     set_property state @@ Player.Property.PlaylistPosition index
-   | Player.Action.PropertyChange property ->
+   | Action.PlaylistSelect index ->
+     set_property state @@ Property.PlaylistPosition index
+   | Action.PropertyChange property ->
      (Mpv.Command.Noop,
       with_property state property)
    | _ ->

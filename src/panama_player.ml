@@ -27,15 +27,20 @@ module PlaylistItem = struct
             ("loading", `Bool t.loading);
            ]
   let set_loading v item = {item with loading = v}
+end
 
-  let of_mpv_playlist playlist mpv_playlist =
+module Playlist = struct
+  type t = PlaylistItem.t list
+  [@@deriving show, yojson]
+
+  let of_mpv playlist mpv_playlist =
     let playlist_length = List.length playlist in
     List.mapi (fun index mpv_item ->
         if index >= playlist_length
         then mpv_item
         else
           let item = List.nth playlist index in
-          { mpv_item with
+          PlaylistItem.{ mpv_item with
             title = item.title;
             media_url = item.media_url;
             loading = item.loading;
@@ -45,12 +50,12 @@ module PlaylistItem = struct
 
   let with_current_item playlist fn =
     List.map (fun item ->
-        if item.current
+        if item.PlaylistItem.current
         then fn item
         else item)
       playlist
 
-  let with_item_at_position position playlist fn =
+  let with_nth_item playlist position fn =
     List.mapi (fun index item ->
         if index == position
         then fn item
@@ -58,10 +63,9 @@ module PlaylistItem = struct
       playlist
 end
 
-
 module Property = struct
   type t
-    = Playlist of PlaylistItem.t list [@name "playlist"]
+    = Playlist of Playlist.t [@name "playlist"]
     | PlaylistPosition of int [@name "playlist-pos"]
     | Volume of int [@name "volume"]
     | Position of int [@name "percent-pos"]
