@@ -23,7 +23,7 @@ let mpv_address = "/tmp/mpv.socket"
 (** path of mpvs ipc socket *)
 
 
-let rec loop web_push mpv_push state actions () =
+let rec loop web mpv state actions () =
   Lwt_stream.next actions
   >>= fun (action) ->
   (* let action_string = Player.Action.show action in *)
