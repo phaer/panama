@@ -23,15 +23,13 @@ let mpv_address = "/tmp/mpv.socket"
 (** path of mpvs ipc socket *)
 
 
-let rec loop web mpv state actions () =
+let rec loop web mpv old_state actions () =
   Lwt_stream.next actions
   >>= fun (action) ->
   (* let action_string = Player.Action.show action in *)
-  let old_state = !state in
   let command, new_state = Store.update old_state action in
 
   (* Lwt_log.ign_debug_f ~section "action: %s" action_string; *)
-  state := new_state;
   Mpv.execute_async mpv command;
 
 
@@ -42,7 +40,7 @@ let rec loop web mpv state actions () =
     if broadcast_state_p
     then web.Web.push_outgoing @@ Some (Store.to_yojson @@ new_state)
     else ())
-  >>= loop web mpv state actions
+  >>= loop web mpv new_state actions
 
 
 let start web_address mpv_address =
@@ -52,12 +50,12 @@ let start web_address mpv_address =
 
   Mpv.execute_async mpv @@ Mpv.Command.LoadFile ("https://www.youtube.com/watch?v=10zB1p1nXHg", "append-play");
 
-  let state = ref (Store.{
+  let state = Store.{
       playing = false;
       volume = 50;
       position = 0;
       playlist = [];
-    })
+    }
   in
   loop web mpv state actions ()
 
