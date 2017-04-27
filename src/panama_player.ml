@@ -8,6 +8,10 @@ open Lwt.Infix
 
 let section = Lwt_log.Section.make "player"
 
+let json_of_string_option = function
+  | Some s -> `String s
+  | None -> `Null
+
 module PlaylistItem = struct
   type t = {
     filename: string;
@@ -21,6 +25,8 @@ module PlaylistItem = struct
 
   let to_yojson t =
     `Assoc [("source_url", `String t.filename);
+            ("media_url", json_of_string_option t.media_url);
+            ("title", json_of_string_option t.title);
             ("index", `Int t.index);
             ("current", `Bool t.current);
             ("playing", `Bool t.playing);
@@ -61,6 +67,13 @@ module Playlist = struct
         then fn item
         else item)
       playlist
+
+  let with_item_by_filename playlist filename fn =
+    List.map (fun item ->
+        if item.PlaylistItem.filename = filename
+        then fn item
+        else item)
+      playlist
 end
 
 module Property = struct
@@ -93,6 +106,7 @@ module Action = struct
     | PlaylistRemove of int [@name "playlist-remove"]
     | PlaylistSelect of int [@name "playlist-select"]
     | PropertyChange of Property.t [@name "property-change"]
+    | ItemResolved of (string * string * string) [@name "item-resolved"]
   [@@deriving show, yojson]
 
   let of_maybe_yojson json =

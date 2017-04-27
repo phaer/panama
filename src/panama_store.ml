@@ -58,6 +58,14 @@ let update state action =
    | Action.PropertyChange property ->
      (Mpv.Command.Noop,
       with_property state property)
+   | Action.ItemResolved (source_url, media_url, title) ->
+     let new_state = { state with
+                       playlist = Playlist.with_item_by_filename state.playlist source_url (fun item ->
+                           { item with
+                             PlaylistItem.media_url = Some media_url;
+                             PlaylistItem.title = Some title})}
+     in
+     (Mpv.Command.Noop, new_state)
    | _ ->
      (Mpv.Command.Noop,
       state))
